@@ -9,6 +9,7 @@ import {
   insertHealthPassportSchema,
   insertChatMessageSchema,
 } from "@shared/schema";
+import { calculateFamilyHistoryScore, standardizeMedicalCondition } from "@shared/risk-engine";
 import { z } from "zod";
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -314,10 +315,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
   return httpServer;
 }
 
-// Risk calculation engine
+// Enhanced risk calculation engine with comprehensive condition analysis
 function calculateGeneticRisks(user: any, familyMembers: any[]): any[] {
-  const conditions = ["Diabetes Type 2", "Heart Disease", "Breast Cancer", "Colon Cancer", "Alzheimer's Disease"];
+  
+  const conditions = [
+    "Diabetes Type 2", 
+    "Heart Disease", 
+    "Breast Cancer", 
+    "Colon Cancer", 
+    "Alzheimer's Disease",
+    "Hypertension",
+    "Stroke",
+    "Osteoporosis",
+    "Depression",
+    "Asthma"
+  ];
   const assessments = [];
+
+  // Standardize medical conditions in family members
+  const standardizedFamilyMembers = familyMembers.map(member => ({
+    ...member,
+    medicalConditions: member.medicalConditions?.map((condition: string) => 
+      standardizeMedicalCondition(condition)
+    ) || []
+  }));
 
   for (const condition of conditions) {
     let riskScore = 0;
@@ -326,19 +347,8 @@ function calculateGeneticRisks(user: any, familyMembers: any[]): any[] {
     let environmentalFactor = 0;
     let ageFactor = 0;
 
-    // Family history analysis
-    const affectedRelatives = familyMembers.filter(member => 
-      member.medicalConditions?.includes(condition)
-    );
-
-    if (affectedRelatives.length > 0) {
-      // Weight by relationship closeness
-      const firstDegreeRelatives = affectedRelatives.filter(member => 
-        ['father', 'mother', 'brother', 'sister', 'son', 'daughter'].includes(member.relation.toLowerCase())
-      );
-      
-      familyHistoryFactor = Math.min(100, firstDegreeRelatives.length * 40 + (affectedRelatives.length - firstDegreeRelatives.length) * 20);
-    }
+    // Enhanced family history analysis using shared algorithms
+    familyHistoryFactor = calculateFamilyHistoryScore(condition, standardizedFamilyMembers, user.gender);
 
     // Lifestyle factors
     if (user.lifestyle) {
@@ -376,7 +386,12 @@ function calculateGeneticRisks(user: any, familyMembers: any[]): any[] {
     // Generate reasoning
     let reasoning = `Risk assessment based on: `;
     const factors = [];
-    if (familyHistoryFactor > 0) factors.push(`family history (${affectedRelatives.length} affected relatives)`);
+    if (familyHistoryFactor > 0) {
+      const affectedCount = familyMembers.filter(member => 
+        member.medicalConditions?.includes(condition)
+      ).length;
+      factors.push(`family history (${affectedCount} affected relative${affectedCount > 1 ? 's' : ''})`);
+    }
     if (lifestyleFactor > 0) factors.push(`lifestyle factors`);
     if (ageFactor > 0) factors.push(`age-related factors`);
     reasoning += factors.join(', ');

@@ -43,13 +43,27 @@ export const familyMembers = pgTable("family_members", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
-// Health conditions reference
+// Enhanced health conditions reference based on medical standards
 export const healthConditions = pgTable("health_conditions", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
   category: text("category").notNull(),
+  subcategory: text("subcategory"),
+  icd10Code: text("icd10_code"), // International Classification of Diseases codes
   heritabilityFactor: integer("heritability_factor").notNull(), // 0-100
+  inheritancePattern: text("inheritance_pattern"), // "polygenic", "mendelian", "multifactorial"
+  genderPrevalence: jsonb("gender_prevalence").$type<{
+    male: number;
+    female: number;
+  }>(),
+  typicalOnsetAge: jsonb("typical_onset_age").$type<{
+    early: number;
+    typical: number;
+    late: number;
+  }>(),
   description: text("description"),
+  preventionRecommendations: text("prevention_recommendations").array().default([]),
+  screeningGuidelines: text("screening_guidelines").array().default([]),
 });
 
 // Risk assessments

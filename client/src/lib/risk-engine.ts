@@ -1,64 +1,26 @@
 // Client-side risk calculation utilities and helpers
-export interface RiskFactors {
-  familyHistory: number;
-  lifestyle: number;
-  environmental: number;
-  age: number;
-}
+// Import shared risk engine functionality
+export {
+  type RiskFactors,
+  type RiskAssessmentResult,
+  FIRST_DEGREE_RELATIONS,
+  SECOND_DEGREE_RELATIONS,
+  THIRD_DEGREE_RELATIONS,
+  CONDITION_WEIGHTS,
+  MEDICAL_CONDITION_CATEGORIES,
+  getRelationshipDegree,
+  classifyAgeOfOnset,
+  standardizeMedicalCondition,
+  calculateConsanguinityRisk,
+  calculateFamilyHistoryScore,
+} from '../../../shared/risk-engine';
 
-export interface RiskAssessmentResult {
-  condition: string;
-  riskScore: number;
-  riskLevel: 'low' | 'medium' | 'high';
-  factors: RiskFactors;
-  reasoning: string;
-}
-
-// Risk level thresholds
+// Client-specific risk utilities
 export const RISK_THRESHOLDS = {
   HIGH: 70,
   MEDIUM: 40,
   LOW: 0,
 };
-
-// Health condition weights for family history
-export const CONDITION_WEIGHTS = {
-  'Diabetes Type 2': {
-    heritability: 0.7,
-    firstDegree: 40,
-    secondDegree: 20,
-  },
-  'Heart Disease': {
-    heritability: 0.5,
-    firstDegree: 35,
-    secondDegree: 18,
-  },
-  'Breast Cancer': {
-    heritability: 0.25,
-    firstDegree: 45,
-    secondDegree: 22,
-  },
-  'Colon Cancer': {
-    heritability: 0.35,
-    firstDegree: 38,
-    secondDegree: 19,
-  },
-  'Alzheimer\'s Disease': {
-    heritability: 0.6,
-    firstDegree: 42,
-    secondDegree: 21,
-  },
-};
-
-// First-degree relatives
-export const FIRST_DEGREE_RELATIONS = [
-  'father',
-  'mother',
-  'brother',
-  'sister',
-  'son',
-  'daughter',
-];
 
 export function getRiskLevel(score: number): 'low' | 'medium' | 'high' {
   if (score >= RISK_THRESHOLDS.HIGH) return 'high';
@@ -73,38 +35,6 @@ export function getRiskColor(level: string): string {
     case 'low': return 'hsl(142, 76%, 47%)';
     default: return 'hsl(210, 11%, 71%)';
   }
-}
-
-export function calculateFamilyHistoryScore(
-  condition: string,
-  familyMembers: any[]
-): number {
-  const weights = CONDITION_WEIGHTS[condition as keyof typeof CONDITION_WEIGHTS];
-  if (!weights) return 0;
-
-  const affectedMembers = familyMembers.filter(member =>
-    member.medicalConditions?.includes(condition)
-  );
-
-  if (affectedMembers.length === 0) return 0;
-
-  let score = 0;
-
-  // Calculate based on relationship closeness
-  const firstDegreeAffected = affectedMembers.filter(member =>
-    FIRST_DEGREE_RELATIONS.includes(member.relation.toLowerCase())
-  );
-
-  const secondDegreeAffected = affectedMembers.filter(member =>
-    !FIRST_DEGREE_RELATIONS.includes(member.relation.toLowerCase())
-  );
-
-  // Apply weights
-  score += firstDegreeAffected.length * weights.firstDegree;
-  score += secondDegreeAffected.length * weights.secondDegree;
-
-  // Cap the maximum family history contribution
-  return Math.min(score, 100);
 }
 
 export function calculateLifestyleScore(
@@ -184,7 +114,7 @@ export function calculateAgeScore(condition: string, age: string): number {
 
 export function generateRiskReasoning(
   condition: string,
-  factors: RiskFactors,
+  factors: any,
   familyMembers: any[]
 ): string {
   const reasonParts = [];
@@ -238,4 +168,24 @@ export function calculateOverallRiskScore(riskAssessments: any[]): number {
   if (riskAssessments.length === 0) return 0;
   const totalScore = riskAssessments.reduce((sum, assessment) => sum + assessment.riskScore, 0);
   return Math.round(totalScore / riskAssessments.length);
+}
+
+// Import medical condition categories from shared module
+import { MEDICAL_CONDITION_CATEGORIES } from '../../../shared/risk-engine';
+
+// Additional client-specific validation functions
+export function validateMedicalCondition(condition: string): boolean {
+  const normalizedCondition = condition.trim();
+  return Object.values(MEDICAL_CONDITION_CATEGORIES)
+    .flat()
+    .includes(normalizedCondition);
+}
+
+export function getMedicalConditionCategory(condition: string): string | null {
+  for (const [category, conditions] of Object.entries(MEDICAL_CONDITION_CATEGORIES)) {
+    if (conditions.includes(condition)) {
+      return category;
+    }
+  }
+  return null;
 }
